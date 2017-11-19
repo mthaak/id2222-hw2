@@ -18,9 +18,14 @@ object FrequentItemsets {
 
     // Find all the association rules with confidence at least minConf
     val minConf = 0.95
-    val associationRules = mineAssociationRules(frequentItemsets, minConf)
+    val associationRules = mineAssociationRules(frequentItemsets, transactions, minConf)
     println("==== Assocation rules with support at least %.4f and confidence at least %.4f ====".format(minSup, minConf))
     associationRules.foreach({ case (lhs, rhs) => println("%s => %s".format(lhs.mkString(" "), rhs.mkString(" "))) })
+
+    // Keep only the interesting association rules (those with a non-empty left or right hand side)
+    val interestingAccosationRules = associationRules.filter({ case (lhs, rhs) => lhs.nonEmpty && rhs.nonEmpty })
+    println("==== Interesting association rules with support at least %.4f and confidence at least %.4f ====".format(minSup, minConf))
+    interestingAccosationRules.foreach({ case (lhs, rhs) => println("%s => %s".format(lhs.mkString(" "), rhs.mkString(" "))) })
   }
 
   def mineFrequentItemsets(transactions: List[Itemset], minSup: Double): Set[Itemset] = {
@@ -44,18 +49,18 @@ object FrequentItemsets {
       if (newSets.nonEmpty) apriori(newSets, k + 1, accSets ++ newSets) else accSets
     }
 
-    apriori(items.map(Set(_)), 2, Set())
+    apriori(items.map(_ => Set[Int]()), 1, Set())
   }
 
-  def mineAssociationRules(itemsets: Set[Itemset], minConf: Double): Set[(Itemset, Itemset)] = {
+  def mineAssociationRules(itemsets: Set[Itemset], transations: List[Itemset], minConf: Double): Set[(Itemset, Itemset)] = {
     itemsets
       .flatMap(set => set.subsets().map(subset => (subset, set -- subset))) // generate all rules as (lhs, rhs) pairs
       .groupBy(_._1) // group by left hand side
       .flatMap({ case (lhs, rhsGroup) =>
-      val countLhs = itemsets.count(lhs.subsetOf(_)) // count occurrences of left hand side
+      val countLhs = transations.count(lhs.subsetOf(_)) // count occurrences of left hand side
       rhsGroup.filter({ case (_, rhs) =>
         val lhsRhs = lhs ++ rhs // items both at the left and right hand side
-      val countLhsRhs = itemsets.count(lhsRhs.subsetOf(_)) // count occurrences of both sides
+      val countLhsRhs = transations.count(lhsRhs.subsetOf(_)) // count occurrences of both sides
         countLhsRhs.toDouble / countLhs >= minConf // only keep (lhs, rhs) pairs with confidence at least minConf
       })
     })
